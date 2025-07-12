@@ -41,8 +41,8 @@ for ($i = 1; $i <= 12; $i++) {
 while ($row = $result->fetch_assoc()) {
     $month = (int)$row['month'];
     if ($month >= 1 && $month <= 12) {
-        $monthly_data[$month]['total_salary'] = $row['total_salary'];
-        $monthly_data[$month]['employee_count'] = $row['employee_count'];
+        $monthly_data[$month]['total_salary'] = (float)$row['total_salary'];
+        $monthly_data[$month]['employee_count'] = (int)$row['employee_count'];
     }
 }
 
@@ -59,12 +59,17 @@ $total_stmt->execute();
 $total_result = $total_stmt->get_result();
 $total_stats = $total_result->fetch_assoc();
 
+// Convert to proper data types
+$total_stats['total_employees'] = (int)($total_stats['total_employees'] ?? 0);
+$total_stats['total_paid'] = (float)($total_stats['total_paid'] ?? 0);
+$total_stats['avg_salary'] = (float)($total_stats['avg_salary'] ?? 0);
+
 // Get available years
 $years_sql = "SELECT DISTINCT year FROM salary_records ORDER BY year DESC";
 $years_result = $conn->query($years_sql);
 $available_years = [];
 while ($row = $years_result->fetch_assoc()) {
-    $available_years[] = $row['year'];
+    $available_years[] = (int)$row['year'];
 }
 
 $stmt->close();
@@ -76,6 +81,7 @@ echo json_encode([
     'year' => $year,
     'monthly_data' => array_values($monthly_data),
     'total_stats' => $total_stats,
-    'available_years' => $available_years
+    'available_years' => $available_years,
+    'success' => true
 ]);
 ?> 

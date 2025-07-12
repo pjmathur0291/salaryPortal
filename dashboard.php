@@ -135,6 +135,42 @@ $conn->close();
             border-bottom: 2px solid #dee2e6;
             font-weight: 600;
         }
+        .chart-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .chart-type-btn {
+            padding: 8px 16px;
+            border: 2px solid #007bff;
+            background: white;
+            color: #007bff;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        .chart-type-btn.active {
+            background: #007bff;
+            color: white;
+        }
+        .chart-type-btn:hover {
+            background: #007bff;
+            color: white;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -175,6 +211,18 @@ $conn->close();
         <!-- Salary Chart -->
         <div class="chart-container">
             <h2>Monthly Salary Distribution</h2>
+            <div class="chart-controls">
+                <button class="chart-type-btn active" data-type="bar">Bar Chart</button>
+                <button class="chart-type-btn" data-type="line">Line Chart</button>
+                <button class="chart-type-btn" data-type="doughnut">Doughnut Chart</button>
+                <button class="chart-type-btn" data-type="pie">Pie Chart</button>
+            </div>
+            <div id="chartLoading" class="loading" style="display: none;">
+                Loading chart data...
+            </div>
+            <div id="chartNoData" class="no-data" style="display: none;">
+                No salary data available for the selected year.
+            </div>
             <canvas id="salaryChart" width="400" height="200"></canvas>
         </div>
 
@@ -217,24 +265,45 @@ $conn->close();
 
     <script>
         let salaryChart;
+        let currentChartType = 'bar';
         const monthNames = <?php echo json_encode(array_values($month_names)); ?>;
 
+        // Chart colors
+        const chartColors = {
+            bar: {
+                backgroundColor: 'rgba(52, 152, 219, 0.8)',
+                borderColor: 'rgba(52, 152, 219, 1)'
+            },
+            line: {
+                backgroundColor: 'rgba(46, 204, 113, 0.2)',
+                borderColor: 'rgba(46, 204, 113, 1)',
+                pointBackgroundColor: 'rgba(46, 204, 113, 1)'
+            },
+            doughnut: [
+                '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6',
+                '#1abc9c', '#34495e', '#e67e22', '#95a5a6', '#16a085',
+                '#c0392b', '#8e44ad'
+            ],
+            pie: [
+                '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6',
+                '#1abc9c', '#34495e', '#e67e22', '#95a5a6', '#16a085',
+                '#c0392b', '#8e44ad'
+            ]
+        };
+
         // Initialize chart
-        function initChart(data) {
+        function initChart(data, chartType = 'bar') {
             const ctx = document.getElementById('salaryChart').getContext('2d');
-            salaryChart = new Chart(ctx, {
-                type: 'bar',
+            
+            if (salaryChart) {
+                salaryChart.destroy();
+            }
+
+            const chartConfig = {
+                type: chartType,
                 data: {
                     labels: monthNames,
-                    datasets: [{
-                        label: 'Total Salary (₹)',
-                        data: data,
-                        backgroundColor: 'rgba(52, 152, 219, 0.8)',
-                        borderColor: 'rgba(52, 152, 219, 1)',
-                        borderWidth: 2,
-                        borderRadius: 5,
-                        borderSkipped: false,
-                    }]
+                    datasets: []
                 },
                 options: {
                     responsive: true,
@@ -247,30 +316,112 @@ $conn->close();
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return 'Total Salary: ₹' + context.parsed.y.toLocaleString('en-IN');
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return '₹' + value.toLocaleString('en-IN');
+                                    if (chartType === 'bar' || chartType === 'line') {
+                                        return 'Total Salary: ₹' + context.parsed.y.toLocaleString('en-IN');
+                                    } else {
+                                        return context.label + ': ₹' + context.parsed.toLocaleString('en-IN');
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            });
+            };
+
+            // Configure based on chart type
+            if (chartType === 'bar') {
+                chartConfig.data.datasets = [{
+                    label: 'Total Salary (₹)',
+                    data: data,
+                    backgroundColor: chartColors.bar.backgroundColor,
+                    borderColor: chartColors.bar.borderColor,
+                    borderWidth: 2,
+                    borderRadius: 5,
+                    borderSkipped: false,
+                }];
+                chartConfig.options.scales = {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                };
+            } else if (chartType === 'line') {
+                chartConfig.data.datasets = [{
+                    label: 'Total Salary (₹)',
+                    data: data,
+                    backgroundColor: chartColors.line.backgroundColor,
+                    borderColor: chartColors.line.borderColor,
+                    borderWidth: 3,
+                    pointBackgroundColor: chartColors.line.pointBackgroundColor,
+                    pointBorderColor: chartColors.line.borderColor,
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    fill: true,
+                    tension: 0.4
+                }];
+                chartConfig.options.scales = {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                };
+            } else if (chartType === 'doughnut' || chartType === 'pie') {
+                // Filter out months with zero salary for pie/doughnut charts
+                const filteredData = [];
+                const filteredLabels = [];
+                data.forEach((value, index) => {
+                    if (value > 0) {
+                        filteredData.push(value);
+                        filteredLabels.push(monthNames[index]);
+                    }
+                });
+
+                chartConfig.data.labels = filteredLabels;
+                chartConfig.data.datasets = [{
+                    label: 'Total Salary (₹)',
+                    data: filteredData,
+                    backgroundColor: chartColors[chartType].slice(0, filteredData.length),
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }];
+            }
+
+            salaryChart = new Chart(ctx, chartConfig);
         }
 
         // Update dashboard data
         function updateDashboard(year) {
+            const loadingDiv = document.getElementById('chartLoading');
+            const noDataDiv = document.getElementById('chartNoData');
+            const canvas = document.getElementById('salaryChart');
+
+            loadingDiv.style.display = 'block';
+            noDataDiv.style.display = 'none';
+            canvas.style.display = 'none';
+
             fetch(`get_salary_data.php?year=${year}`)
                 .then(response => response.json())
                 .then(data => {
+                    loadingDiv.style.display = 'none';
+                    canvas.style.display = 'block';
+
+                    // Check if there's any data
+                    const hasData = data.monthly_data.some(item => item.total_salary > 0);
+                    
+                    if (!hasData) {
+                        noDataDiv.style.display = 'block';
+                        canvas.style.display = 'none';
+                        return;
+                    }
+
                     // Update statistics
                     document.getElementById('totalEmployees').textContent = data.total_stats.total_employees || 0;
                     document.getElementById('totalPaid').textContent = '₹' + (data.total_stats.total_paid || 0).toLocaleString('en-IN', {minimumFractionDigits: 2});
@@ -278,16 +429,16 @@ $conn->close();
 
                     // Update chart
                     const salaryData = data.monthly_data.map(item => item.total_salary);
-                    if (salaryChart) {
-                        salaryChart.destroy();
-                    }
-                    initChart(salaryData);
+                    initChart(salaryData, currentChartType);
 
                     // Update table
                     updateTable(data.monthly_data);
                 })
                 .catch(error => {
                     console.error('Error fetching data:', error);
+                    loadingDiv.style.display = 'none';
+                    noDataDiv.style.display = 'block';
+                    canvas.style.display = 'none';
                 });
         }
 
@@ -322,6 +473,23 @@ $conn->close();
         // Add event listener for year selection
         document.getElementById('yearSelect').addEventListener('change', function() {
             updateDashboard(this.value);
+        });
+
+        // Add event listeners for chart type buttons
+        document.querySelectorAll('.chart-type-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Remove active class from all buttons
+                document.querySelectorAll('.chart-type-btn').forEach(b => b.classList.remove('active'));
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                // Update chart type
+                currentChartType = this.dataset.type;
+                
+                // Get current year and update chart
+                const currentYear = document.getElementById('yearSelect').value;
+                updateDashboard(currentYear);
+            });
         });
     </script>
     
