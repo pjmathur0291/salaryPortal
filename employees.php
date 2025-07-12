@@ -80,14 +80,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_id'])) {
     }
 }
 
-// Fetch only active employees
+// Fetch only active employees, with search and department filter
 $employees = [];
-$result = $conn->query("SELECT * FROM employees WHERE status = 'active' ORDER BY id DESC");
+$where = ["status = 'active'"];
+$params = [];
+$types = '';
+if (!empty($_GET['search'])) {
+    $where[] = 'name LIKE ?';
+    $params[] = '%' . $_GET['search'] . '%';
+    $types .= 's';
+}
+if (!empty($_GET['department'])) {
+    $where[] = 'department = ?';
+    $params[] = $_GET['department'];
+    $types .= 's';
+}
+$sql = "SELECT * FROM employees";
+if ($where) {
+    $sql .= " WHERE " . implode(' AND ', $where);
+}
+$sql .= " ORDER BY id DESC";
+$stmt = $conn->prepare($sql);
+if ($params) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$result = $stmt->get_result();
 if ($result) {
     while ($row = $result->fetch_assoc()) {
         $employees[] = $row;
     }
 }
+$stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -137,7 +161,21 @@ if ($result) {
         </div>
         <div class="form-group">
             <label for="department">Department</label>
-            <input type="text" name="department" id="department">
+            <select name="department" id="department" required>
+                <option value="">Select Department</option>
+                <option value="Social Media">Social Media</option>
+                <option value="Developer">Developer</option>
+                <option value="SEO">SEO</option>
+                <option value="Google Ads">Google Ads</option>
+                <option value="Meta Ads">Meta Ads</option>
+                <option value="Counselor">Counselor</option>
+                <option value="HR">HR</option>
+                <option value="Sales">Sales</option>
+                <option value="Video Editing">Video Editing</option>
+                <option value="Graphic Designing">Graphic Designing</option>
+                <option value="CEO">CEO</option>
+                <option value="Accountant">Accountant</option>
+            </select>
         </div>
         <div class="form-group">
             <label for="email">Personal Email</label>
@@ -223,76 +261,47 @@ if ($result) {
     </form>
     <h2>Employee List</h2>
     <a href="archived_employees.php" style="margin-bottom: 10px; display: inline-block;">View Archived Employees</a>
-    <div class="table-responsive">
-    <table class="table table-striped table-bordered align-middle">
-        <thead class="table-primary">
-            <tr>
-                <th class="sticky-col sticky-header">S.No</th>
-                <th class="sticky-col-2 sticky-header">Name</th>
-                <th class="sticky-header">Department</th>
-                <th class="sticky-header">Basic Salary</th>
-                <th class="sticky-header">Email</th>
-                <th class="sticky-header">DOB</th>
-                <th class="sticky-header">Company Email</th>
-                <th class="sticky-header">Date of Joining</th>
-                <th class="sticky-header">Documents Submitted</th>
-                <th class="sticky-header">Manager</th>
-                <th class="sticky-header">Assets Given</th>
-                <th class="sticky-header">Phone</th>
-                <th class="sticky-header">Emergency Phone</th>
-                <th class="sticky-header">Father's Name</th>
-                <th class="sticky-header">Address</th>
-                <th class="sticky-header">City</th>
-                <th class="sticky-header">State</th>
-                <th class="sticky-header">Qualification</th>
-                <th class="sticky-header">Previous Employer(s)</th>
-                <th class="sticky-header">Bank Name</th>
-                <th class="sticky-header">Branch Name</th>
-                <th class="sticky-header">Account Number</th>
-                <th class="sticky-header">IFSC Code</th>
-                <th class="sticky-header">Joined</th>
-                <th class="sticky-header">Edit/Update</th>
-            </tr>
-        </thead>
-        <tbody>
+    <form method="get" class="row g-3 mb-4" style="max-width:600px;">
+        <div class="col-md-7">
+            <input type="text" name="search" class="form-control" placeholder="Search by name..." value="<?= isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '' ?>">
+        </div>
+        <div class="col-md-4">
+            <select name="department" class="form-select">
+                <option value="">All Departments</option>
+                <option value="Social Media" <?= (isset($_GET['department']) && $_GET['department'] == 'Social Media') ? 'selected' : '' ?>>Social Media</option>
+                <option value="Developer" <?= (isset($_GET['department']) && $_GET['department'] == 'Developer') ? 'selected' : '' ?>>Developer</option>
+                <option value="SEO" <?= (isset($_GET['department']) && $_GET['department'] == 'SEO') ? 'selected' : '' ?>>SEO</option>
+                <option value="Google Ads" <?= (isset($_GET['department']) && $_GET['department'] == 'Google Ads') ? 'selected' : '' ?>>Google Ads</option>
+                <option value="Meta Ads" <?= (isset($_GET['department']) && $_GET['department'] == 'Meta Ads') ? 'selected' : '' ?>>Meta Ads</option>
+                <option value="Counselor" <?= (isset($_GET['department']) && $_GET['department'] == 'Counselor') ? 'selected' : '' ?>>Counselor</option>
+                <option value="HR" <?= (isset($_GET['department']) && $_GET['department'] == 'HR') ? 'selected' : '' ?>>HR</option>
+                <option value="Sales" <?= (isset($_GET['department']) && $_GET['department'] == 'Sales') ? 'selected' : '' ?>>Sales</option>
+                <option value="Video Editing" <?= (isset($_GET['department']) && $_GET['department'] == 'Video Editing') ? 'selected' : '' ?>>Video Editing</option>
+                <option value="Graphic Designing" <?= (isset($_GET['department']) && $_GET['department'] == 'Graphic Designing') ? 'selected' : '' ?>>Graphic Designing</option>
+                <option value="CEO" <?= (isset($_GET['department']) && $_GET['department'] == 'CEO') ? 'selected' : '' ?>>CEO</option>
+                <option value="Accountant" <?= (isset($_GET['department']) && $_GET['department'] == 'Accountant') ? 'selected' : '' ?>>Accountant</option>
+            </select>
+        </div>
+        <div class="col-md-1">
+            <button type="submit" class="btn btn-primary w-100">Search</button>
+        </div>
+    </form>
+    <div class="employee-list">
         <?php if (count($employees) > 0): ?>
-            <?php $sn = 1; foreach ($employees as $emp): ?>
-                <tr>
-                    <td class="sticky-col"><?= $sn++ ?></td>
-                    <td class="sticky-col-2"><?= htmlspecialchars($emp['name']) ?></td>
-                    <td><?= htmlspecialchars($emp['department']) ?></td>
-                    <td><?= htmlspecialchars($emp['basic_salary']) ?></td>
-                    <td><?= htmlspecialchars($emp['email']) ?></td>
-                    <td><?= htmlspecialchars($emp['dob']) ?></td>
-                    <td><?= htmlspecialchars($emp['company_email']) ?></td>
-                    <td><?= htmlspecialchars($emp['date_of_joining']) ?></td>
-                    <td><?= htmlspecialchars($emp['documents_submitted']) ?></td>
-                    <td><?= htmlspecialchars($emp['manager']) ?></td>
-                    <td><?= htmlspecialchars($emp['assets_given']) ?></td>
-                    <td><?= htmlspecialchars($emp['phone']) ?></td>
-                    <td><?= htmlspecialchars($emp['emergency_phone']) ?></td>
-                    <td><?= htmlspecialchars($emp['father_name']) ?></td>
-                    <td><?= htmlspecialchars($emp['address']) ?></td>
-                    <td><?= htmlspecialchars($emp['city']) ?></td>
-                    <td><?= htmlspecialchars($emp['state']) ?></td>
-                    <td><?= htmlspecialchars($emp['qualification']) ?></td>
-                    <td><?= htmlspecialchars($emp['previous_employers']) ?></td>
-                    <td><?= htmlspecialchars($emp['bank_name']) ?></td>
-                    <td><?= htmlspecialchars($emp['branch_name']) ?></td>
-                    <td><?= htmlspecialchars($emp['account_number']) ?></td>
-                    <td><?= htmlspecialchars($emp['ifsc_code']) ?></td>
-                    <td><?= htmlspecialchars($emp['created_at']) ?></td>
-                    <td>
-                        <a href="edit_employee.php?id=<?= $emp['id'] ?>" class="btn btn-primary btn-sm">Edit</a>
-                        <button type="button" class="btn btn-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#archiveModal" data-emp-id="<?= $emp['id'] ?>" data-emp-name="<?= htmlspecialchars($emp['name']) ?>">Archive</button>
-                    </td>
-                </tr>
+            <?php foreach ($employees as $emp): ?>
+                <div class="employee-card" style="border:1px solid #ddd; border-radius:8px; padding:18px 20px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; background:#fafbfc;">
+                    <div>
+                        <div style="font-size:1.2em; font-weight:600; color:#1976d2;">Name: <?= htmlspecialchars($emp['name']) ?></div>
+                        <div style="font-size:0.98em; color:#444;">Employee ID: <?= htmlspecialchars($emp['id']) ?></div>
+                    </div>
+                    <div>
+                        <a href="employee_detail.php?id=<?= $emp['id'] ?>" class="btn btn-primary" style="padding:8px 18px; border-radius:5px; font-weight:500;">View Details</a>
+                    </div>
+                </div>
             <?php endforeach; ?>
         <?php else: ?>
-            <tr><td colspan="26">No employees found.</td></tr>
+            <div style="color:#888;">No employees found.</div>
         <?php endif; ?>
-        </tbody>
-    </table>
     </div>
 </div>
 <!-- Archive Modal -->

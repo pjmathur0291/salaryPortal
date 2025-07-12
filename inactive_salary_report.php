@@ -103,6 +103,7 @@ $records = $stmt->get_result();
                 <th>Half Days</th>
                 <th>Early Leaves</th>
                 <th>Net Salary</th>
+                <th>Slip</th>
             </tr>
         </thead>
         <tbody>
@@ -120,10 +121,13 @@ $records = $stmt->get_result();
                     <td><?= htmlspecialchars($row['half_days']) ?></td>
                     <td><?= htmlspecialchars($row['early_leaves']) ?></td>
                     <td><?= htmlspecialchars($row['net_salary']) ?></td>
+                    <td>
+                        <a href="generate_slip.php?id=<?= htmlspecialchars($row['id']) ?>" class="btn btn-sm btn-success" target="_blank">Slip</a>
+                    </td>
                 </tr>
             <?php endwhile; ?>
         <?php else: ?>
-            <tr><td colspan="11">No records found.</td></tr>
+            <tr><td colspan="12">No records found.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

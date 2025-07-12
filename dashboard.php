@@ -8,13 +8,14 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
 }
 require 'db.php';
 
-// Fetch monthly salary data for the current year, only for valid months
+// Fetch monthly salary data for the current year, only for valid months and active employees
 $current_year = date('Y');
-$sql = "SELECT month, SUM(net_salary) as total_salary, COUNT(*) as employee_count 
-        FROM salary_records 
-        WHERE year = ? AND month BETWEEN 1 AND 12
-        GROUP BY month 
-        ORDER BY month ASC";
+$sql = "SELECT sr.month, SUM(sr.net_salary) as total_salary, COUNT(*) as employee_count 
+        FROM salary_records sr
+        JOIN employees e ON sr.employee_id = e.id
+        WHERE sr.year = ? AND sr.month BETWEEN 1 AND 12 AND e.status = 'active'
+        GROUP BY sr.month 
+        ORDER BY sr.month ASC";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param('i', $current_year);
 $stmt->execute();
@@ -45,21 +46,22 @@ while ($row = $result->fetch_assoc()) {
     }
 }
 
-// Get total statistics
+// Get total statistics for active employees only
 $total_sql = "SELECT 
-    COUNT(DISTINCT employee_id) as total_employees,
-    SUM(net_salary) as total_paid,
-    AVG(net_salary) as avg_salary
-    FROM salary_records 
-    WHERE year = ?";
+    COUNT(DISTINCT e.id) as total_employees,
+    SUM(sr.net_salary) as total_paid,
+    AVG(sr.net_salary) as avg_salary
+    FROM salary_records sr
+    JOIN employees e ON sr.employee_id = e.id
+    WHERE sr.year = ? AND e.status = 'active'";
 $total_stmt = $conn->prepare($total_sql);
 $total_stmt->bind_param('i', $current_year);
 $total_stmt->execute();
 $total_result = $total_stmt->get_result();
 $total_stats = $total_result->fetch_assoc();
 
-// Get available years for dropdown BEFORE closing connection
-$years_sql = "SELECT DISTINCT year FROM salary_records ORDER BY year DESC";
+// Get available years for dropdown (only for active employees)
+$years_sql = "SELECT DISTINCT sr.year FROM salary_records sr JOIN employees e ON sr.employee_id = e.id WHERE e.status = 'active' ORDER BY sr.year DESC";
 $years_result = $conn->query($years_sql);
 $available_years = [];
 while ($row = $years_result->fetch_assoc()) {
@@ -264,7 +266,7 @@ $conn->close();
     </div>
 
     <script>
-        let salaryChart;
+        let chartInstance = null;
         let currentChartType = 'bar';
         const monthNames = <?php echo json_encode(array_values($month_names)); ?>;
 
@@ -291,18 +293,18 @@ $conn->close();
             ]
         };
 
-        // Initialize chart
-        function initChart(data, chartType = 'bar') {
+        // Create or update the chart
+        function createChartWithData(data, chartType = 'bar') {
             const ctx = document.getElementById('salaryChart').getContext('2d');
-            
-            if (salaryChart) {
-                salaryChart.destroy();
+            if (chartInstance) {
+                chartInstance.destroy();
             }
-
+            const labels = data.monthly_data.map(item => item.month_name);
+            const values = data.monthly_data.map(item => item.total_salary);
             const chartConfig = {
                 type: chartType,
                 data: {
-                    labels: monthNames,
+                    labels: labels,
                     datasets: []
                 },
                 options: {
@@ -327,12 +329,10 @@ $conn->close();
                     }
                 }
             };
-
-            // Configure based on chart type
             if (chartType === 'bar') {
                 chartConfig.data.datasets = [{
                     label: 'Total Salary (₹)',
-                    data: data,
+                    data: values,
                     backgroundColor: chartColors.bar.backgroundColor,
                     borderColor: chartColors.bar.borderColor,
                     borderWidth: 2,
@@ -352,7 +352,7 @@ $conn->close();
             } else if (chartType === 'line') {
                 chartConfig.data.datasets = [{
                     label: 'Total Salary (₹)',
-                    data: data,
+                    data: values,
                     backgroundColor: chartColors.line.backgroundColor,
                     borderColor: chartColors.line.borderColor,
                     borderWidth: 3,
@@ -377,13 +377,12 @@ $conn->close();
                 // Filter out months with zero salary for pie/doughnut charts
                 const filteredData = [];
                 const filteredLabels = [];
-                data.forEach((value, index) => {
+                values.forEach((value, index) => {
                     if (value > 0) {
                         filteredData.push(value);
-                        filteredLabels.push(monthNames[index]);
+                        filteredLabels.push(labels[index]);
                     }
                 });
-
                 chartConfig.data.labels = filteredLabels;
                 chartConfig.data.datasets = [{
                     label: 'Total Salary (₹)',
@@ -393,8 +392,7 @@ $conn->close();
                     borderColor: '#fff'
                 }];
             }
-
-            salaryChart = new Chart(ctx, chartConfig);
+            chartInstance = new Chart(ctx, chartConfig);
         }
 
         // Update dashboard data
@@ -402,35 +400,27 @@ $conn->close();
             const loadingDiv = document.getElementById('chartLoading');
             const noDataDiv = document.getElementById('chartNoData');
             const canvas = document.getElementById('salaryChart');
-
             loadingDiv.style.display = 'block';
             noDataDiv.style.display = 'none';
             canvas.style.display = 'none';
-
             fetch(`get_salary_data.php?year=${year}`)
                 .then(response => response.json())
                 .then(data => {
                     loadingDiv.style.display = 'none';
                     canvas.style.display = 'block';
-
                     // Check if there's any data
                     const hasData = data.monthly_data.some(item => item.total_salary > 0);
-                    
                     if (!hasData) {
                         noDataDiv.style.display = 'block';
                         canvas.style.display = 'none';
                         return;
                     }
-
                     // Update statistics
                     document.getElementById('totalEmployees').textContent = data.total_stats.total_employees || 0;
                     document.getElementById('totalPaid').textContent = '₹' + (data.total_stats.total_paid || 0).toLocaleString('en-IN', {minimumFractionDigits: 2});
                     document.getElementById('avgSalary').textContent = '₹' + (data.total_stats.avg_salary || 0).toLocaleString('en-IN', {minimumFractionDigits: 2});
-
                     // Update chart
-                    const salaryData = data.monthly_data.map(item => item.total_salary);
-                    initChart(salaryData, currentChartType);
-
+                    createChartWithData(data, currentChartType);
                     // Update table
                     updateTable(data.monthly_data);
                 })
@@ -446,7 +436,6 @@ $conn->close();
         function updateTable(monthlyData) {
             const tbody = document.querySelector('#monthlyTable tbody');
             tbody.innerHTML = '';
-            
             monthlyData.forEach(data => {
                 const avg = data.employee_count > 0 ? data.total_salary / data.employee_count : 0;
                 const row = `
@@ -468,7 +457,7 @@ $conn->close();
         }
 
         // Initialize with current year data
-        initChart(<?php echo json_encode(array_column($monthly_data, 'total_salary')); ?>);
+        createChartWithData({monthly_data: <?php echo json_encode(array_values($monthly_data)); ?>}, currentChartType);
 
         // Add event listener for year selection
         document.getElementById('yearSelect').addEventListener('change', function() {
@@ -482,10 +471,8 @@ $conn->close();
                 document.querySelectorAll('.chart-type-btn').forEach(b => b.classList.remove('active'));
                 // Add active class to clicked button
                 this.classList.add('active');
-                
                 // Update chart type
                 currentChartType = this.dataset.type;
-                
                 // Get current year and update chart
                 const currentYear = document.getElementById('yearSelect').value;
                 updateDashboard(currentYear);

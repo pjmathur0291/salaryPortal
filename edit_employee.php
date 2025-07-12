@@ -60,7 +60,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <div class="col-md-6">
             <label for="department" class="form-label">Department</label>
-            <input type="text" name="department" id="department" class="form-control" value="<?= htmlspecialchars($emp['department']) ?>">
+            <select name="department" id="department" class="form-control" required>
+                <option value="">Select Department</option>
+                <option value="Social Media" <?= $emp['department'] == 'Social Media' ? 'selected' : '' ?>>Social Media</option>
+                <option value="Developer" <?= $emp['department'] == 'Developer' ? 'selected' : '' ?>>Developer</option>
+                <option value="SEO" <?= $emp['department'] == 'SEO' ? 'selected' : '' ?>>SEO</option>
+                <option value="Google Ads" <?= $emp['department'] == 'Google Ads' ? 'selected' : '' ?>>Google Ads</option>
+                <option value="Meta Ads" <?= $emp['department'] == 'Meta Ads' ? 'selected' : '' ?>>Meta Ads</option>
+                <option value="Counselor" <?= $emp['department'] == 'Counselor' ? 'selected' : '' ?>>Counselor</option>
+                <option value="HR" <?= $emp['department'] == 'HR' ? 'selected' : '' ?>>HR</option>
+                <option value="Sales" <?= $emp['department'] == 'Sales' ? 'selected' : '' ?>>Sales</option>
+                <option value="Video Editing" <?= $emp['department'] == 'Video Editing' ? 'selected' : '' ?>>Video Editing</option>
+                <option value="Graphic Designing" <?= $emp['department'] == 'Graphic Designing' ? 'selected' : '' ?>>Graphic Designing</option>
+                <option value="CEO" <?= $emp['department'] == 'CEO' ? 'selected' : '' ?>>CEO</option>
+                <option value="Accountant" <?= $emp['department'] == 'Accountant' ? 'selected' : '' ?>>Accountant</option>
+            </select>
         </div>
         <div class="col-md-6">
             <label for="email" class="form-label">Personal Email</label>
