@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full Screen Image Carousel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .carousel-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .carousel {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .carousel-slides {
+            display: flex;
+            height: 100%;
+            transition: transform 0.6s ease-in-out;
+        }
+
+        .carousel-slide {
+            width: 100vw;
+            height: 700px;
+            flex-shrink: 0;
+            position: relative;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .carousel-slide img {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .carousel-slide {
+                height: auto;
+                min-height: unset;
+                background: none !important;
+                background-image: none !important;
+                display: block;
+            }
+            .carousel-slide img {
+                display: block;
+                width: 100%;
+                height: auto;
+            }
+        }
+
+        .carousel-btn,
+        .carousel-nav,
+        .slide-counter {
+            display: none !important;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .carousel-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+            .carousel-btn.prev {
+                left: 15px;
+            }
+            .carousel-btn.next {
+                right: 15px;
+            }
+            .carousel-nav {
+                bottom: 20px;
+                gap: 10px;
+            }
+            .nav-dot {
+                width: 12px;
+                height: 12px;
+            }
+            .slide-counter {
+                top: 20px;
+                right: 20px;
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+            .carousel-slide {
+                height: 300px;
+            }
+        }
+        @media (max-width: 480px) {
+            .carousel-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 18px;
+            }
+            .carousel-btn.prev {
+                left: 10px;
+            }
+            .carousel-btn.next {
+                right: 10px;
+            }
+            .carousel-nav {
+                bottom: 15px;
+                gap: 8px;
+            }
+            .nav-dot {
+                width: 10px;
+                height: 10px;
+            }
+            .slide-counter {
+                top: 15px;
+                right: 15px;
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+        @media (max-width: 320px) {
+            .carousel-btn {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="carousel-container">
+        <div class="carousel">
+            <div class="carousel-slides" id="carouselSlides">
+                <div class="carousel-slide" style="background-image: url('https://scopecollege.co.in/wp-content/uploads/2024/01/Scope_banner_new_02-1280x400.webp');">
+                    <img src="https://scopecollege.co.in/wp-content/uploads/2024/01/Scope_banner_new_02-1280x400.webp" alt="Banner 1">
+                </div>
+                <div class="carousel-slide" style="background-image: url('https://scopecollege.co.in/wp-content/uploads/2025/06/image_2025-06-03_18-09-50-1600x500.webp');">
+                    <img src="https://scopecollege.co.in/wp-content/uploads/2025/06/image_2025-06-03_18-09-50-1600x500.webp" alt="Banner 2">
+                </div>
+                <div class="carousel-slide" style="background-image: url('https://scopecollege.co.in/wp-content/uploads/2025/06/SCOPE-3rd-Banner-1280x400.webp');">
+                    <img src="https://scopecollege.co.in/wp-content/uploads/2025/06/SCOPE-3rd-Banner-1280x400.webp" alt="Banner 3">
+                </div>
+                <div class="carousel-slide" style="background-image: url('https://scopecollege.co.in/wp-content/uploads/2025/05/image_2025-05-16_15-35-45-1600x500.webp');">
+                    <img src="https://scopecollege.co.in/wp-content/uploads/2025/05/image_2025-05-16_15-35-45-1600x500.webp" alt="Banner 4">
+                </div>
+                <div class="carousel-slide" style="background-image: url('https://scopecollege.co.in/wp-content/uploads/2025/05/image_2025-05-16_09-59-45-1600x500.webp');">
+                    <img src="https://scopecollege.co.in/wp-content/uploads/2025/05/image_2025-05-16_09-59-45-1600x500.webp" alt="Banner 5">
+                </div>
+            </div>
+            <!-- Removed arrows, dots, and slide counter -->
+        </div>
+        <!-- Removed arrows, dots, and slide counter -->
+    </div>
+    <script>
+        let currentSlide = 0;
+        const slides = document.getElementById('carouselSlides');
+        const slideCounter = document.getElementById('slideCounter');
+        const carouselNav = document.getElementById('carouselNav');
+        // Get all slides
+        const slideElements = document.querySelectorAll('.carousel-slide');
+        const totalSlides = slideElements.length;
+        // Set the width of the slides container dynamically
+        slides.style.width = `${100 * totalSlides}vw`;
+        // Auto-play functionality
+        let autoPlayInterval = setInterval(autoPlay, 5000);
+        // Generate navigation dots
+        function generateDots() {
+            carouselNav.innerHTML = '';
+            for (let i = 0; i < totalSlides; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'nav-dot';
+                dot.onclick = () => goToSlide(i);
+                carouselNav.appendChild(dot);
+            }
+        }
+        function showSlide(n) {
+            currentSlide = n;
+            slides.style.transform = `translateX(-${currentSlide * 100}vw)`;
+            // Update slide counter
+            slideCounter.textContent = `${currentSlide + 1} / ${totalSlides}`;
+            // Update active dot
+            const dots = document.querySelectorAll('.nav-dot');
+            dots.forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentSlide);
+            });
+        }
+        function changeSlide(direction) {
+            currentSlide = (currentSlide + direction + totalSlides) % totalSlides;
+            showSlide(currentSlide);
+            resetAutoPlay();
+        }
+        function goToSlide(n) {
+            showSlide(n);
+            resetAutoPlay();
+        }
+        function autoPlay() {
+            changeSlide(1);
+        }
+        function resetAutoPlay() {
+            clearInterval(autoPlayInterval);
+            autoPlayInterval = setInterval(autoPlay, 5000);
+        }
+        // Pause auto-play on hover
+        const carousel = document.querySelector('.carousel');
+        carousel.addEventListener('mouseenter', () => {
+            clearInterval(autoPlayInterval);
+        });
+        carousel.addEventListener('mouseleave', () => {
+            autoPlayInterval = setInterval(autoPlay, 5000);
+        });
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                changeSlide(-1);
+            } else if (e.key === 'ArrowRight') {
+                changeSlide(1);
+            }
+        });
+        // Touch/swipe support for mobile
+        let startX = 0;
+        let startY = 0;
+        let endX = 0;
+        let endY = 0;
+        carousel.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        });
+        carousel.addEventListener('touchend', (e) => {
+            endX = e.changedTouches[0].clientX;
+            endY = e.changedTouches[0].clientY;
+            handleSwipe();
+        });
+        function handleSwipe() {
+            const swipeThreshold = 50;
+            const diffX = startX - endX;
+            const diffY = startY - endY;
+            // Only trigger if horizontal swipe is more significant than vertical
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > swipeThreshold) {
+                if (diffX > 0) {
+                    changeSlide(1); // Swipe left
+                } else {
+                    changeSlide(-1); // Swipe right
+                }
+            }
+        }
+        // Initialize the carousel
+        function init() {
+            generateDots();
+            showSlide(0);
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            // Recalculate slide positions if needed
+            showSlide(currentSlide);
+        });
+    </script>
+</body>
+</html> 
