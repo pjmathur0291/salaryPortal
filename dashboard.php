@@ -265,6 +265,33 @@ $conn->close();
         </div>
     </div>
 
+    <!-- Comparison Section -->
+    <div class="card mt-4 mb-4 p-3">
+      <h4>Compare Two Months</h4>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label>Month 1</label>
+          <select id="compareMonth1" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+          <label>Year 1</label>
+          <select id="compareYear1" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+          <label>Month 2</label>
+          <select id="compareMonth2" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+          <label>Year 2</label>
+          <select id="compareYear2" class="form-select"></select>
+        </div>
+        <div class="col-md-12 mt-2">
+          <button id="compareBtn" class="btn btn-primary">Compare</button>
+        </div>
+      </div>
+    </div>
+    <div id="compareResult"></div>
+
     <script>
         let chartInstance = null;
         let currentChartType = 'bar';
@@ -478,6 +505,69 @@ $conn->close();
                 updateDashboard(currentYear);
             });
         });
+
+        // Comparison feature
+        const compareMonthNames = [
+          "January", "February", "March", "April", "May", "June",
+          "July", "August", "September", "October", "November", "December"
+        ];
+        const compareAvailableYears = <?php echo json_encode($available_years); ?>;
+        function fillCompareDropdowns() {
+          const m1 = document.getElementById('compareMonth1');
+          const m2 = document.getElementById('compareMonth2');
+          const y1 = document.getElementById('compareYear1');
+          const y2 = document.getElementById('compareYear2');
+          m1.innerHTML = m2.innerHTML = '';
+          y1.innerHTML = y2.innerHTML = '';
+          compareMonthNames.forEach((m, i) => {
+            m1.innerHTML += `<option value="${i+1}">${m}</option>`;
+            m2.innerHTML += `<option value="${i+1}">${m}</option>`;
+          });
+          compareAvailableYears.forEach(y => {
+            y1.innerHTML += `<option value="${y}">${y}</option>`;
+            y2.innerHTML += `<option value="${y}">${y}</option>`;
+          });
+          // Default to current month/year and previous month/year
+          const now = new Date();
+          m1.value = now.getMonth() + 1;
+          y1.value = now.getFullYear();
+          m2.value = now.getMonth() === 0 ? 12 : now.getMonth();
+          y2.value = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+        }
+        fillCompareDropdowns();
+        document.getElementById('compareBtn').onclick = function() {
+          const m1 = document.getElementById('compareMonth1').value;
+          const y1 = document.getElementById('compareYear1').value;
+          const m2 = document.getElementById('compareMonth2').value;
+          const y2 = document.getElementById('compareYear2').value;
+          Promise.all([
+            fetch(`get_salary_data.php?year=${y1}&month=${m1}`).then(r=>r.json()),
+            fetch(`get_salary_data.php?year=${y2}&month=${m2}`).then(r=>r.json())
+          ]).then(([data1, data2]) => {
+            const d1 = data1.single_month || data1.monthly_data[0];
+            const d2 = data2.single_month || data2.monthly_data[0];
+            document.getElementById('compareResult').innerHTML = `
+              <div class="row mt-3 mb-4">
+                <div class="col-md-6">
+                  <div class="card p-3">
+                    <h5>${compareMonthNames[d1.month-1]} ${y1}</h5>
+                    <div>Total Salary: <b>₹${(d1.total_salary||0).toLocaleString('en-IN', {minimumFractionDigits:2})}</b></div>
+                    <div>Employee Count: <b>${d1.employee_count||0}</b></div>
+                    <div>Average: <b>₹${(d1.avg_salary||0).toLocaleString('en-IN', {minimumFractionDigits:2})}</b></div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="card p-3">
+                    <h5>${compareMonthNames[d2.month-1]} ${y2}</h5>
+                    <div>Total Salary: <b>₹${(d2.total_salary||0).toLocaleString('en-IN', {minimumFractionDigits:2})}</b></div>
+                    <div>Employee Count: <b>${d2.employee_count||0}</b></div>
+                    <div>Average: <b>₹${(d2.avg_salary||0).toLocaleString('en-IN', {minimumFractionDigits:2})}</b></div>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+        };
     </script>
     
 </body>
