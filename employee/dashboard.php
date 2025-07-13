@@ -11,6 +11,25 @@ $stmt->bind_param('i', $id);
 $stmt->execute();
 $emp = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+
+// Fetch leave statistics
+$approved_leaves = 0;
+$pending_leaves = 0;
+$total_leaves = 0;
+
+$stat_stmt = $conn->prepare("SELECT status, COUNT(*) as count FROM leave_applications WHERE employee_id = ? GROUP BY status");
+$stat_stmt->bind_param('i', $id);
+$stat_stmt->execute();
+$stat_result = $stat_stmt->get_result();
+while ($row = $stat_result->fetch_assoc()) {
+    if ($row['status'] === 'approved') {
+        $approved_leaves = $row['count'];
+    } elseif ($row['status'] === 'pending') {
+        $pending_leaves = $row['count'];
+    }
+    $total_leaves += $row['count'];
+}
+$stat_stmt->close();
 ?>
 <!DOCTYPE html>
 <html>
@@ -27,7 +46,6 @@ $stmt->close();
             margin-bottom: 2rem;
             border-radius: 0 0 20px 20px;
         }
-        
         .stat-card {
             background: white;
             border-radius: 15px;
@@ -37,12 +55,10 @@ $stmt->close();
             border: none;
             height: 100%;
         }
-        
         .stat-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 8px 30px rgba(0,0,0,0.15);
         }
-        
         .stat-icon {
             width: 60px;
             height: 60px;
@@ -53,13 +69,11 @@ $stmt->close();
             font-size: 1.5rem;
             margin-bottom: 1rem;
         }
-        
         .stat-number {
             font-size: 2rem;
             font-weight: 700;
             margin-bottom: 0.5rem;
         }
-        
         .action-card {
             background: white;
             border-radius: 15px;
@@ -70,12 +84,10 @@ $stmt->close();
             text-align: center;
             height: 100%;
         }
-        
         .action-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 8px 30px rgba(0,0,0,0.15);
         }
-        
         .action-icon {
             width: 80px;
             height: 80px;
@@ -86,7 +98,6 @@ $stmt->close();
             font-size: 2rem;
             margin: 0 auto 1.5rem;
         }
-        
         .btn-custom {
             padding: 12px 30px;
             border-radius: 25px;
@@ -95,12 +106,10 @@ $stmt->close();
             letter-spacing: 0.5px;
             transition: all 0.3s ease;
         }
-        
         .btn-custom:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
-        
         .profile-info {
             background: rgba(255,255,255,0.1);
             border-radius: 15px;
@@ -129,7 +138,6 @@ $stmt->close();
             </div>
         </div>
     </div>
-
     <div class="container">
         <!-- Profile Information -->
         <div class="row mb-4">
@@ -178,7 +186,6 @@ $stmt->close();
                 </div>
             </div>
         </div>
-
         <!-- Statistics Cards -->
         <div class="row mb-4">
             <div class="col-md-4 mb-3">
@@ -186,7 +193,7 @@ $stmt->close();
                     <div class="stat-icon bg-primary bg-opacity-10 text-primary">
                         <i class="fas fa-calendar-check"></i>
                     </div>
-                    <div class="stat-number text-primary">0</div>
+                    <div class="stat-number text-primary"><?= $approved_leaves ?></div>
                     <div class="text-muted">Approved Leaves</div>
                 </div>
             </div>
@@ -195,7 +202,7 @@ $stmt->close();
                     <div class="stat-icon bg-warning bg-opacity-10 text-warning">
                         <i class="fas fa-clock"></i>
                     </div>
-                    <div class="stat-number text-warning">0</div>
+                    <div class="stat-number text-warning"><?= $pending_leaves ?></div>
                     <div class="text-muted">Pending Leaves</div>
                 </div>
             </div>
@@ -204,12 +211,11 @@ $stmt->close();
                     <div class="stat-icon bg-success bg-opacity-10 text-success">
                         <i class="fas fa-calendar-day"></i>
                     </div>
-                    <div class="stat-number text-success">0</div>
+                    <div class="stat-number text-success"><?= $total_leaves ?></div>
                     <div class="text-muted">Total Applications</div>
                 </div>
             </div>
         </div>
-
         <!-- Action Cards -->
         <div class="row">
             <div class="col-md-6 mb-3">
@@ -238,7 +244,6 @@ $stmt->close();
             </div>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
