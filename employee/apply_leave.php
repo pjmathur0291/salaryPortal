@@ -28,6 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $days = (strtotime($to_date) - strtotime($from_date)) / (60*60*24) + 1;
         if ($days > 30) {
             $error = "Leave duration cannot exceed 30 days.";
+        } else if ($leave_type === 'Paid' && $days > 1) {
+            $error = "Paid leave can only be for 1 day.";
         } else {
             // Restrict to only 1 paid leave ever (regardless of approval status)
             if ($leave_type === 'Paid') {

@@ -17,6 +17,7 @@ $result = $conn->query("SELECT * FROM leave_applications WHERE employee_id = $em
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
+    <?php include 'header.php'; ?>
 <div class="container" style="max-width:1000px;">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-history me-2"></i>My Leave History</h2>
