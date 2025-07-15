@@ -80,8 +80,9 @@ $stmt->close();
                         <div style="font-size:1.2em; font-weight:600; color:#1976d2;">Name: <?= htmlspecialchars($emp['name']) ?></div>
                         <div style="font-size:0.98em; color:#444;">Employee ID: <?= htmlspecialchars($emp['id']) ?></div>
                     </div>
-                    <div>
+                    <div style="display: flex; gap: 10px;">
                         <a href="employee_detail.php?id=<?= $emp['id'] ?>" class="btn btn-primary" style="padding:8px 18px; border-radius:5px; font-weight:500;">View Details</a>
+                        <a href="archive_employee.php?id=<?= $emp['id'] ?>" class="btn btn-warning" style="padding:8px 18px; border-radius:5px; font-weight:500;" onclick="return confirm('Are you sure you want to mark this employee as inactive?')">Inactive</a>
                     </div>
                 </div>
             <?php endforeach; ?>

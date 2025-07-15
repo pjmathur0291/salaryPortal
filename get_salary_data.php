@@ -2,116 +2,91 @@
 session_start();
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header('Content-Type: application/json');
-    echo json_encode(['error' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
     exit;
 }
-
 require 'db.php';
 
-$year = isset($_GET['year']) ? intval($_GET['year']) : date('Y');
-$month = isset($_GET['month']) ? intval($_GET['month']) : null;
+$employee_id = intval($_POST['employee_id'] ?? 0);
+$month = intval($_POST['month'] ?? 0);
+$year = intval($_POST['year'] ?? date('Y'));
 
-// Only include active employees
-$month_names = [
-    1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
-    5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
-    9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+$response = [
+    'success' => false,
+    'allowances' => 0,
+    'deductions' => 0,
+    'leaves' => 0,
+    'half_days' => 0,
+    'early_leaves' => 0,
+    'late_leaves' => 0,
+    'basic_salary' => 0,
+    'net_salary' => 0
 ];
 
-// Fetch monthly salary data for the specified year (and month if provided), only for active employees
-if ($month) {
-    // Single month summary for comparison
-    $sql = "SELECT sr.month, SUM(sr.net_salary) as total_salary, COUNT(*) as employee_count, AVG(sr.net_salary) as avg_salary
-            FROM salary_records sr
-            JOIN employees e ON sr.employee_id = e.id
-            WHERE sr.year = ? AND sr.month = ? AND e.status = 'active'
-            GROUP BY sr.month";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param('ii', $year, $month);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $single_month = [
-        'month' => $month,
-        'month_name' => $month_names[$month] ?? '',
-        'total_salary' => 0,
-        'employee_count' => 0,
-        'avg_salary' => 0
-    ];
-    if ($row = $result->fetch_assoc()) {
-        $single_month['total_salary'] = (float)$row['total_salary'];
-        $single_month['employee_count'] = (int)$row['employee_count'];
-        $single_month['avg_salary'] = (float)$row['avg_salary'];
+if ($employee_id && $month && $year) {
+    // Fetch employee base data
+    $emp = $conn->query("SELECT * FROM employees WHERE id = $employee_id")->fetch_assoc();
+    if ($emp) {
+        $response['basic_salary'] = floatval($emp['basic_salary'] ?? 0);
+        $response['allowances'] = floatval($emp['allowances'] ?? 0);
+        $response['deductions'] = floatval($emp['deductions'] ?? 0);
     }
-    $stmt->close();
-    $monthly_data = [$single_month];
-} else {
-    // All months for the year
-    $sql = "SELECT sr.month, SUM(sr.net_salary) as total_salary, COUNT(*) as employee_count 
-            FROM salary_records sr
-            JOIN employees e ON sr.employee_id = e.id
-            WHERE sr.year = ? AND sr.month BETWEEN 1 AND 12 AND e.status = 'active'
-            GROUP BY sr.month 
-            ORDER BY sr.month ASC";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param('i', $year);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $monthly_data = [];
-    // Initialize all months with 0
-    for ($i = 1; $i <= 12; $i++) {
-        $monthly_data[$i] = [
-            'month_name' => $month_names[$i],
-            'total_salary' => 0,
-            'employee_count' => 0
-        ];
+
+    // Fetch leaves for the month
+    $leave_types = ['Paid', 'Unpaid', 'Half Day', 'Early', 'Late'];
+    $leaves = [];
+    foreach ($leave_types as $type) {
+        $q = $conn->prepare("SELECT COUNT(*) as cnt FROM leave_applications WHERE employee_id=? AND leave_type=? AND status='approved' AND MONTH(from_date)=? AND YEAR(from_date)=?");
+        $q->bind_param('isii', $employee_id, $type, $month, $year);
+        $q->execute();
+        $r = $q->get_result()->fetch_assoc();
+        $leaves[$type] = intval($r['cnt']);
+        $q->close();
     }
-    while ($row = $result->fetch_assoc()) {
-        $m = (int)$row['month'];
-        if ($m >= 1 && $m <= 12) {
-            $monthly_data[$m]['total_salary'] = (float)$row['total_salary'];
-            $monthly_data[$m]['employee_count'] = (int)$row['employee_count'];
-        }
+    $response['leaves'] = $leaves['Paid'] + $leaves['Unpaid'];
+    $response['half_days'] = $leaves['Half Day'];
+    $response['early_leaves'] = $leaves['Early'];
+    $response['late_leaves'] = $leaves['Late'];
+
+    // Fetch lifetime leaves for each type (for first-free logic)
+    $lifetime = [];
+    foreach ($leave_types as $type) {
+        $q = $conn->prepare("SELECT COUNT(*) as cnt FROM leave_applications WHERE employee_id=? AND leave_type=? AND status='approved'");
+        $q->bind_param('is', $employee_id, $type);
+        $q->execute();
+        $r = $q->get_result()->fetch_assoc();
+        $lifetime[$type] = intval($r['cnt']);
+        $q->close();
     }
-    $monthly_data = array_values($monthly_data);
-    $stmt->close();
+
+    // Calculate per day salary
+    $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+    $per_day_salary = $response['basic_salary'] / $days_in_month;
+
+    // Deduction logic
+    $deduction = 0;
+    // Paid/Unpaid: full day, after first free
+    $deductible_paid = max(0, $leaves['Paid'] - (1 - min(1, $lifetime['Paid'] - $leaves['Paid'])));
+    $deductible_unpaid = max(0, $leaves['Unpaid'] - (1 - min(1, $lifetime['Unpaid'] - $leaves['Unpaid'])));
+    $deduction += ($deductible_paid + $deductible_unpaid) * $per_day_salary;
+    // Half Day: 0.5 per day, after first free
+    $deductible_half = max(0, $leaves['Half Day'] - (1 - min(1, $lifetime['Half Day'] - $leaves['Half Day'])));
+    $deduction += $deductible_half * ($per_day_salary / 2);
+    // Early: 1/4 per day, after first free
+    $deductible_early = max(0, $leaves['Early'] - (1 - min(1, $lifetime['Early'] - $leaves['Early'])));
+    $deduction += $deductible_early * ($per_day_salary / 4);
+    // Late: 1/4 per day, after first free
+    $deductible_late = max(0, $leaves['Late'] - (1 - min(1, $lifetime['Late'] - $leaves['Late'])));
+    $deduction += $deductible_late * ($per_day_salary / 4);
+
+    // Add other deductions
+    $total_deductions = $response['deductions'] + $deduction;
+
+    // Net salary
+    $response['net_salary'] = round($response['basic_salary'] + $response['allowances'] - $total_deductions, 2);
+    $response['success'] = true;
 }
-
-// Get total statistics for active employees only
-$total_sql = "SELECT 
-    COUNT(DISTINCT e.id) as total_employees,
-    SUM(sr.net_salary) as total_paid,
-    AVG(sr.net_salary) as avg_salary
-    FROM salary_records sr
-    JOIN employees e ON sr.employee_id = e.id
-    WHERE sr.year = ? AND e.status = 'active'";
-$total_stmt = $conn->prepare($total_sql);
-$total_stmt->bind_param('i', $year);
-$total_stmt->execute();
-$total_result = $total_stmt->get_result();
-$total_stats = $total_result->fetch_assoc();
-$total_stats['total_employees'] = (int)($total_stats['total_employees'] ?? 0);
-$total_stats['total_paid'] = (float)($total_stats['total_paid'] ?? 0);
-$total_stats['avg_salary'] = (float)($total_stats['avg_salary'] ?? 0);
-$total_stmt->close();
-
-// Get available years for dropdown (only for active employees)
-$years_sql = "SELECT DISTINCT sr.year FROM salary_records sr JOIN employees e ON sr.employee_id = e.id WHERE e.status = 'active' ORDER BY sr.year DESC";
-$years_result = $conn->query($years_sql);
-$available_years = [];
-while ($row = $years_result->fetch_assoc()) {
-    $available_years[] = $row['year'];
-}
-
-$conn->close();
 
 header('Content-Type: application/json');
-echo json_encode([
-    'year' => $year,
-    'month' => $month,
-    'monthly_data' => $monthly_data,
-    'single_month' => isset($single_month) ? $single_month : null,
-    'total_stats' => $total_stats,
-    'available_years' => $available_years,
-    'success' => true
-]);
-?> 
+echo json_encode($response);
+exit; 

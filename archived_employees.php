@@ -24,6 +24,9 @@ if ($result) {
     <?php if (isset($_GET['restored'])): ?>
         <div style="color:green; margin-bottom:10px;">Employee restored successfully.</div>
     <?php endif; ?>
+    <?php if (isset($_GET['success'])): ?>
+        <div style="color:green; margin-bottom:10px;">Employee archived successfully.</div>
+    <?php endif; ?>
     <table border="1" class="table table-striped table-bordered align-middle">
         <thead>
             <tr>
